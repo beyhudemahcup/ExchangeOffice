@@ -62,7 +62,7 @@ namespace ExchangeOffice
                     CreateConnection();
                     DataTable dataTable = new DataTable();
 
-                    sqlCommand = new SqlCommand("SELECT Amount FROM Currency_Master WHERE Id = @CurrencyToId", sqlConnection);
+                    sqlCommand = new SqlCommand("SELECT Amount FROM Currency WHERE Id = @CurrencyToId", sqlConnection);
                     sqlCommand.CommandType = CommandType.Text;
 
                     if (CurrencyToId != 0)
