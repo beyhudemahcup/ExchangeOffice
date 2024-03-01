@@ -2,7 +2,9 @@
 using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
+using System.Net.Http;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -21,12 +23,24 @@ namespace ExchangeOffice
         private double FromAmount = 0;
         private double ToAmount = 0;
 
+        APIClass.Root value = new APIClass.Root();
+
         public MainWindow()
         {
             InitializeComponent();
-            BindCurrency();
+            GetValue();
+            //BindCurrency();
             GetData();
         }
+
+        private async void GetValue()
+        {
+            value = await APIClass.GetData<APIClass.Root>("https://openexchangerates.org/api/latest.json?app_id=3255c05823ed41c081b0a85cf6349d6e");
+            BindCurrency();
+        }
+
+   
+
         private void Clear_Click(object sender, RoutedEventArgs e)
         {
             ClearTextBoxes();
@@ -41,6 +55,7 @@ namespace ExchangeOffice
         {
 
         }
+
         private void txtAmount_TextChanged(object sender, TextChangedEventArgs e)
         {
 
@@ -49,6 +64,47 @@ namespace ExchangeOffice
         private void txtCurrencyName_TextChanged(object sender, TextChangedEventArgs e)
         {
 
+        }
+
+        private void BindCurrency()
+        {
+            //created datatable using manual data 
+            // ManualCurrencies();
+
+            //created datatable using data comes from my database
+            //CreateConnection();
+            //DatabaseCurrencies();
+
+            //created datatable using data comes from website as a API
+            APICurrencies();
+        }
+
+        private void APICurrencies()
+        {
+            DataTable dataTable = new DataTable();
+            dataTable.Columns.Add("Text");
+            dataTable.Columns.Add("Value");
+            dataTable.Rows.Add("SELECT", 0);
+            dataTable.Rows.Add("INR", value.rates.INR);
+            dataTable.Rows.Add("JPY", value.rates.JPY);
+            dataTable.Rows.Add("USD", value.rates.USD);
+            dataTable.Rows.Add("EUR", value.rates.EUR);
+            dataTable.Rows.Add("NZD", value.rates.NZD);
+            dataTable.Rows.Add("CAD", value.rates.CAD);
+            dataTable.Rows.Add("ISK", value.rates.ISK);
+            dataTable.Rows.Add("PHP", value.rates.PHP);
+            dataTable.Rows.Add("DKK", value.rates.DKK);
+            dataTable.Rows.Add("CZK", value.rates.CZK);
+
+            cmbFromCurrency.ItemsSource = dataTable.DefaultView;
+            cmbFromCurrency.DisplayMemberPath = "Text";
+            cmbFromCurrency.SelectedValuePath = "Value";
+            cmbFromCurrency.SelectedIndex = 0;
+
+            cmbToCurrency.ItemsSource = dataTable.DefaultView;
+            cmbToCurrency.DisplayMemberPath = "Text";
+            cmbToCurrency.SelectedValuePath = "Value";
+            cmbToCurrency.SelectedIndex = 0;
         }
 
         private void cmbFromCurrency_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -137,24 +193,14 @@ namespace ExchangeOffice
             }
             else
             {
-                ConvertedValue = double.Parse(cmbFromCurrency.SelectedValue.ToString()) * double.Parse(txtCurrency.Text) / double.Parse(cmbToCurrency.SelectedValue.ToString());
+                ConvertedValue = double.Parse(cmbToCurrency.SelectedValue.ToString())
+                    * double.Parse(txtCurrency.Text) / double.Parse(cmbFromCurrency.SelectedValue.ToString());
 
                 lblCurrency.Content = cmbToCurrency.Text + " " + ConvertedValue.ToString("N3");
             }
         }
 
-        private void BindCurrency()
-        {
-            //created datatable using manual data 
-            // ManualCurrencies();
-
-            //created datatable using data comes from my database
-            CreateConnection();
-
-            DatabaseCurrencies();
-
-            
-        }
+      
 
         private void DatabaseCurrencies()
         {
