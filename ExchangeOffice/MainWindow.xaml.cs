@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
@@ -15,58 +16,96 @@ namespace ExchangeOffice
     /// </summary>
     public partial class MainWindow : Window
     {
-        SqlConnection sqlConnection = new SqlConnection();
-        SqlCommand sqlCommand = new SqlCommand();
-        SqlDataAdapter sqlDataAdapter = new SqlDataAdapter();
+        public SqlConnection sqlConnection = new SqlConnection();
+        public SqlCommand sqlCommand = new SqlCommand();
+        public SqlDataAdapter sqlDataAdapter = new SqlDataAdapter();
 
-        private int CurrencyId = 0;
-        private double FromAmount = 0;
-        private double ToAmount = 0;
+        Root value = new Root();
 
-        APIClass.Root value = new APIClass.Root();
+        public int CurrencyId = 0;
+        public double FromAmount = 0;
+        public double ToAmount = 0;
 
         public MainWindow()
         {
             InitializeComponent();
             GetValue();
-            //BindCurrency();
             GetData();
         }
 
-        private async void GetValue()
+        public class Root
         {
-            value = await APIClass.GetData<APIClass.Root>("https://openexchangerates.org/api/latest.json?app_id=3255c05823ed41c081b0a85cf6349d6e");
-            BindCurrency();
+            //open exchange rate ID
+            //3255c05823ed41c081b0a85cf6349d6e
+            public Rate rates { get; set; }
+            public long timestamp;
+            public string license;
         }
 
-   
+        public class Rate
+        {
+            //those values comes from a website that provides APIs
+            public double INR { get; set; }
+            public double JPY { get; set; }
+            public double USD { get; set; }
+            public double EUR { get; set; }
+            public double NZD { get; set; }
+            public double CAD { get; set; }
+            public double ISK { get; set; }
+            public double PHP { get; set; }
+            public double DKK { get; set; }
+            public double CZK { get; set; }
+        }
+
+        public static async Task<Root> GetData<T>(string url)
+        {
+            var root = new Root();
+            try
+            {
+                using (var client = new HttpClient())
+                {
+                    client.Timeout = TimeSpan.FromMinutes(1);
+                    HttpResponseMessage httpResponseMessage = await client.GetAsync(url);
+
+                    if (httpResponseMessage.StatusCode == System.Net.HttpStatusCode.OK)
+                    {
+                        var responseString = await httpResponseMessage.Content.ReadAsStringAsync();
+                        var responseObject = JsonConvert.DeserializeObject<Root>(responseString);
+
+                        MessageBox.Show($"Timestamp: {responseObject.timestamp}, Information: {MessageBoxButton.OK}");
+
+                        return responseObject;
+                    }
+                    return root;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+                return root;
+            }
+        }
+
+        public async void GetValue()
+        {
+            value = await GetData<Root>("https://openexchangerates.org/api/latest.json?app_id=3255c05823ed41c081b0a85cf6349d6e");
+            BindCurrency();
+        }
 
         private void Clear_Click(object sender, RoutedEventArgs e)
         {
             ClearTextBoxes();
         }
 
-        private void txtCurrency_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
-        {
+        private void txtCurrency_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e) { }
 
-        }
+        private void cmbToCurrency_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e) { }
 
-        private void cmbToCurrency_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
-        {
+        private void txtAmount_TextChanged(object sender, TextChangedEventArgs e) { }
 
-        }
+        private void txtCurrencyName_TextChanged(object sender, TextChangedEventArgs e) { }
 
-        private void txtAmount_TextChanged(object sender, TextChangedEventArgs e)
-        {
-
-        }
-
-        private void txtCurrencyName_TextChanged(object sender, TextChangedEventArgs e)
-        {
-
-        }
-
-        private void BindCurrency()
+        public void BindCurrency()
         {
             //created datatable using manual data 
             // ManualCurrencies();
@@ -79,34 +118,6 @@ namespace ExchangeOffice
             APICurrencies();
         }
 
-        private void APICurrencies()
-        {
-            DataTable dataTable = new DataTable();
-            dataTable.Columns.Add("Text");
-            dataTable.Columns.Add("Value");
-            dataTable.Rows.Add("SELECT", 0);
-            dataTable.Rows.Add("INR", value.rates.INR);
-            dataTable.Rows.Add("JPY", value.rates.JPY);
-            dataTable.Rows.Add("USD", value.rates.USD);
-            dataTable.Rows.Add("EUR", value.rates.EUR);
-            dataTable.Rows.Add("NZD", value.rates.NZD);
-            dataTable.Rows.Add("CAD", value.rates.CAD);
-            dataTable.Rows.Add("ISK", value.rates.ISK);
-            dataTable.Rows.Add("PHP", value.rates.PHP);
-            dataTable.Rows.Add("DKK", value.rates.DKK);
-            dataTable.Rows.Add("CZK", value.rates.CZK);
-
-            cmbFromCurrency.ItemsSource = dataTable.DefaultView;
-            cmbFromCurrency.DisplayMemberPath = "Text";
-            cmbFromCurrency.SelectedValuePath = "Value";
-            cmbFromCurrency.SelectedIndex = 0;
-
-            cmbToCurrency.ItemsSource = dataTable.DefaultView;
-            cmbToCurrency.DisplayMemberPath = "Text";
-            cmbToCurrency.SelectedValuePath = "Value";
-            cmbToCurrency.SelectedIndex = 0;
-        }
-
         private void cmbFromCurrency_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
             try
@@ -117,7 +128,6 @@ namespace ExchangeOffice
 
                     CreateConnection();
                     DataTable dataTable = new DataTable();
-
                     sqlCommand = new SqlCommand("SELECT Amount FROM Currency WHERE Id = @CurrencyToId", sqlConnection);
                     sqlCommand.CommandType = CommandType.Text;
 
@@ -125,7 +135,6 @@ namespace ExchangeOffice
                     {
                         sqlCommand.Parameters.AddWithValue("@CurrencyToId", CurrencyToId);
                     }
-
                     sqlDataAdapter = new SqlDataAdapter(sqlCommand);
 
                     sqlDataAdapter.Fill(dataTable);
@@ -143,18 +152,10 @@ namespace ExchangeOffice
             }
         }
 
-        public void CreateConnection()
-        {
-            string connection = ConfigurationManager.ConnectionStrings["ConnectionString"].ConnectionString;
-            sqlConnection = new SqlConnection(connection);
-            sqlConnection.Open();
-        }
-
         private void NumberValidationTextBox(object sender, System.Windows.Input.TextCompositionEventArgs e)
         {
             Regex regex = new Regex("[^0-9]+");
             e.Handled = regex.IsMatch(e.Text);
-
         }
 
         private void Convert_Click(object sender, RoutedEventArgs e)
@@ -200,7 +201,54 @@ namespace ExchangeOffice
             }
         }
 
-      
+        private void APICurrencies()
+        {
+            DataTable dataTable = new DataTable();
+            dataTable.Columns.Add("Text");
+            dataTable.Columns.Add("Value");
+            dataTable.Rows.Add("SELECT", 0);
+            dataTable.Rows.Add("INR", value.rates.INR);
+            dataTable.Rows.Add("JPY", value.rates.JPY);
+            dataTable.Rows.Add("USD", value.rates.USD);
+            dataTable.Rows.Add("EUR", value.rates.EUR);
+            dataTable.Rows.Add("NZD", value.rates.NZD);
+            dataTable.Rows.Add("CAD", value.rates.CAD);
+            dataTable.Rows.Add("ISK", value.rates.ISK);
+            dataTable.Rows.Add("PHP", value.rates.PHP);
+            dataTable.Rows.Add("DKK", value.rates.DKK);
+            dataTable.Rows.Add("CZK", value.rates.CZK);
+
+            cmbFromCurrency.ItemsSource = dataTable.DefaultView;
+            cmbFromCurrency.DisplayMemberPath = "Text";
+            cmbFromCurrency.SelectedValuePath = "Value";
+            cmbFromCurrency.SelectedIndex = 0;
+
+            cmbToCurrency.ItemsSource = dataTable.DefaultView;
+            cmbToCurrency.DisplayMemberPath = "Text";
+            cmbToCurrency.SelectedValuePath = "Value";
+            cmbToCurrency.SelectedIndex = 0;
+        }
+
+        public void GetData()
+        {
+            CreateConnection();
+            DataTable dataTable = new DataTable();
+            sqlCommand = new SqlCommand("SELECT * FROM Currency", sqlConnection);
+            sqlCommand.CommandType = CommandType.Text;
+            sqlDataAdapter = new SqlDataAdapter(sqlCommand);
+            sqlDataAdapter.Fill(dataTable);
+
+            if (dataTable != null && dataTable.Rows.Count > 0)
+            {
+                dgvCurrency.ItemsSource = dataTable.DefaultView;
+            }
+            else
+            {
+                dgvCurrency.ItemsSource = null;
+            }
+
+            sqlConnection.Close();
+        }
 
         private void DatabaseCurrencies()
         {
@@ -292,14 +340,44 @@ namespace ExchangeOffice
                 {
                     if (CurrencyId > 0)
                     {
-                        UpdateCurrencyTable();
+                        //Show the confirmation message
+                        if (MessageBox.Show("Are you sure you want to update ?", "Information", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                        {
+                            CreateConnection();
+                            DataTable dt = new DataTable();
+
+                            //Update Query Record update using Id
+                            sqlCommand = new SqlCommand("UPDATE Currency SET Amount = @Amount, CurrencyName = @CurrencyName WHERE Id = @Id", sqlConnection);
+                            sqlCommand.CommandType = CommandType.Text;
+                            sqlCommand.Parameters.AddWithValue("@Id", CurrencyId);
+                            sqlCommand.Parameters.AddWithValue("@Amount", txtAmount.Text);
+                            sqlCommand.Parameters.AddWithValue("@CurrencyName", txtCurrencyName.Text);
+                            sqlCommand.ExecuteNonQuery();
+
+                            sqlConnection.Close();
+
+                            MessageBox.Show("Data updated successfully", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                        }
                     }
                     else
                     {
-                        InsertCurrencyTable();
+                        if (MessageBox.Show("Are you sure you want to save ?", "Information", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                        {
+                            CreateConnection();
+                            //Insert query to Save data in the table
+                            sqlCommand = new SqlCommand("INSERT INTO Currency (Amount, CurrencyName) VALUES(@Amount, @CurrencyName)", sqlConnection);
+                            sqlCommand.CommandType = CommandType.Text;
+                            sqlCommand.Parameters.AddWithValue("@Amount", txtAmount.Text);
+                            sqlCommand.Parameters.AddWithValue("@CurrencyName", txtCurrencyName.Text);
+                            sqlCommand.ExecuteNonQuery();
+                            sqlConnection.Close();
+
+                            MessageBox.Show("Data saved successfully", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                        }
                     }
                     ClearMaster();
                 }
+
             }
             catch (Exception ex)
             {
@@ -307,46 +385,13 @@ namespace ExchangeOffice
             }
         }
 
-        private void InsertCurrencyTable()
+        public void CreateConnection()
         {
-            if (MessageBox.Show("Are you sure you want to save ?", "Information", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
-            {
-                CreateConnection();
-                //Insert query to Save data in the table
-                sqlCommand = new SqlCommand("INSERT INTO Currency (Amount, CurrencyName) VALUES(@Amount, @CurrencyName)", sqlConnection);
-                sqlCommand.CommandType = CommandType.Text;
-                sqlCommand.Parameters.AddWithValue("@Amount", txtAmount.Text);
-                sqlCommand.Parameters.AddWithValue("@CurrencyName", txtCurrencyName.Text);
-                sqlCommand.ExecuteNonQuery();
-                sqlConnection.Close();
-
-                MessageBox.Show("Data saved successfully", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
+            string connection = ConfigurationManager.ConnectionStrings["ConnectionString"].ConnectionString;
+            sqlConnection = new SqlConnection(connection);
+            sqlConnection.Open();
         }
-
-        private void UpdateCurrencyTable()
-        {
-            //Show the confirmation message
-            if (MessageBox.Show("Are you sure you want to update ?", "Information", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
-            {
-                CreateConnection();
-                DataTable dt = new DataTable();
-
-                //Update Query Record update using Id
-                sqlCommand = new SqlCommand("UPDATE Currency SET Amount = @Amount, CurrencyName = @CurrencyName WHERE Id = @Id", sqlConnection);
-                sqlCommand.CommandType = CommandType.Text;
-                sqlCommand.Parameters.AddWithValue("@Id", CurrencyId);
-                sqlCommand.Parameters.AddWithValue("@Amount", txtAmount.Text);
-                sqlCommand.Parameters.AddWithValue("@CurrencyName", txtCurrencyName.Text);
-                sqlCommand.ExecuteNonQuery();
-
-                sqlConnection.Close();
-
-                MessageBox.Show("Data updated successfully", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-        }
-
-        private void ClearMaster()
+        public void ClearMaster()
         {
             try
             {
@@ -364,27 +409,6 @@ namespace ExchangeOffice
             }
         }
 
-        private void GetData()
-        {
-            CreateConnection();
-            DataTable dataTable = new DataTable();
-            sqlCommand = new SqlCommand("SELECT * FROM Currency", sqlConnection);
-            sqlCommand.CommandType = CommandType.Text;
-            sqlDataAdapter = new SqlDataAdapter(sqlCommand);
-            sqlDataAdapter.Fill(dataTable);
-
-            if (dataTable != null && dataTable.Rows.Count > 0)
-            {
-                dgvCurrency.ItemsSource = dataTable.DefaultView;
-            }
-            else
-            {
-                dgvCurrency.ItemsSource = null;
-            }
-
-            sqlConnection.Close();
-        }
-
         private void btnCancel_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -393,7 +417,7 @@ namespace ExchangeOffice
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                ErrorMessage(ex);
             }
         }
 
@@ -402,6 +426,7 @@ namespace ExchangeOffice
             try
             {
                 DataGrid dataGrid = (DataGrid)sender;
+
                 DataRowView selectedRow = dataGrid.CurrentItem as DataRowView;
 
                 if (selectedRow != null)
@@ -422,8 +447,8 @@ namespace ExchangeOffice
                             {
                                 CreateConnection();
                                 DataTable dt = new DataTable();
-                                sqlCommand = new SqlCommand("DELETE FROM Currency WHERE Id = @Id", sqlConnection);
-                                sqlCommand.CommandType = CommandType.Text;
+                               sqlCommand = new SqlCommand("DELETE FROM Currency WHERE Id = @Id", sqlConnection);
+                               sqlCommand.CommandType = CommandType.Text;
 
                                 //CurrencyId set in @Id parameter and send it in delete statement
                                 sqlCommand.Parameters.AddWithValue("@Id", CurrencyId);
@@ -439,8 +464,13 @@ namespace ExchangeOffice
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                ErrorMessage(ex);
             }
+        }
+
+        private void ErrorMessage(Exception ex)
+        {
+            MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 }
